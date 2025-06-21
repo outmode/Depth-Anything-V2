@@ -8,6 +8,14 @@ from .dinov2 import DINOv2
 from .util.blocks import FeatureFusionBlock, _make_scratch
 from .util.transform import Resize, NormalizeImage, PrepareForNet
 
+import os
+directml_available = False
+if os.name == 'nt':
+    try:
+        import torch_directml
+        directml_available = True
+    except ImportError:
+        directml_available = False
 
 def _make_fusion_block(features, use_bn, size=None):
     return FeatureFusionBlock(
@@ -214,8 +222,10 @@ class DepthAnythingV2(nn.Module):
         
         image = transform({'image': image})['image']
         image = torch.from_numpy(image).unsqueeze(0)
-        
-        DEVICE = 'cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu'
+
+        DEVICE = 'cuda' if torch.cuda.is_available() else "xpu" if torch.xpu.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu'
+        if directml_available and DEVICE == "cpu":
+            DEVICE = torch_directml.device()
         image = image.to(DEVICE)
         
         return image, (h, w)
